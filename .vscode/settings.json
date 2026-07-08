@@ -1,0 +1,81 @@
+{
+    "workbench.colorTheme": "ƒ - Gruvbox - Operator Mono/Italic",
+    "workbench.iconTheme": "vira-icons-carbon",
+
+    "window.commandCenter": false,
+    "window.menuBarVisibility": "compact",
+
+    "editor.fontFamily": "Iosevka, Consolas",
+    "editor.fontSize": 15,
+    "editor.fontWeight": "450",
+    "editor.lineHeight": 24,
+    "editor.fontLigatures": true,
+
+    "editor.cursorStyle": "block",
+    "editor.cursorWidth": 3,
+    "editor.cursorBlinking": "phase",
+    "editor.cursorSmoothCaretAnimation": "on",
+    "editor.cursorSurroundingLines": 8,
+    "editor.cursorSurroundingLinesStyle": "all",
+
+    "editor.padding.top": 8,
+    "editor.padding.bottom": 8,
+
+    "editor.smoothScrolling": true,
+    "editor.mouseWheelZoom": true,
+
+    "editor.minimap.enabled": false,
+    "editor.scrollBeyondLastLine": false,
+    "editor.wordWrap": "off",
+    "editor.tabSize": 4,
+
+    "editor.renderWhitespace": "selection",
+    "editor.renderLineHighlight": "gutter",
+
+    "editor.guides.indentation": true,
+    "editor.guides.bracketPairs": true,
+    "editor.guides.highlightActiveBracketPair": true,
+    "editor.bracketPairColorization.enabled": true,
+
+    "editor.matchBrackets": "always",
+    "editor.stickyScroll.enabled": true,
+
+    "editor.codeLens": false,
+    "editor.selectionHighlight": true,
+    "editor.occurrencesHighlight": "multiFile",
+
+    "editor.inlineSuggest.enabled": true,
+    "editor.inlayHints.enabled": "off",
+    "editor.linkedEditing": true,
+
+    "editor.unicodeHighlight.ambiguousCharacters": false,
+    "editor.unicodeHighlight.invisibleCharacters": false,
+    "editor.unicodeHighlight.nonBasicASCII": false,
+
+    "workbench.editor.enablePreview": false,
+    "workbench.editor.showTabs": "multiple",
+
+    "workbench.tree.indent": 20,
+    "workbench.list.smoothScrolling": true,
+
+    "explorer.compactFolders": true,
+    "explorer.confirmDelete": false,
+    "explorer.confirmPasteNative": false,
+
+    "breadcrumbs.enabled": true,
+
+    "terminal.integrated.fontFamily": "Maple Mono NF",
+    "terminal.integrated.fontSize": 14,
+    "terminal.integrated.fontWeight": "400",
+    "terminal.integrated.lineHeight": 1.2,
+    "terminal.integrated.cursorStyle": "block",
+    "terminal.integrated.cursorWidth": 3,
+    "terminal.integrated.cursorBlinking": true,
+    "terminal.integrated.smoothScrolling": true,
+    "terminal.integrated.gpuAcceleration": "on",
+    "terminal.integrated.tabs.enabled": false,
+    "terminal.integrated.scrollback": 10000,
+
+    "git.autofetch": true,
+    "git.confirmSync": false
+}
