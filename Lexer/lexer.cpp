@@ -1,67 +1,98 @@
 #include "lexer.h"
 
+#include<iostream>
 #include <cctype>
-#include <cstdio>
 #include <cstdlib>
-
+#include <iostream>
+#include <string>
 
 std::string IdentifierStr;
 double NumVal;
 
 int gettok() {
-    static int LastChar = ' ';
+    static std::string Line;
+    static size_t Pos = 0;
 
-    // Skip whitespace.
-    while (isspace(static_cast<unsigned char>(LastChar)))
-        LastChar = getchar();
-    // Identifier: [a-zA-Z][a-zA-Z0-9]*
-    if (isalpha(LastChar) || LastChar == '_') {
-        IdentifierStr.clear();
-        
-        do {
-            IdentifierStr += static_cast<char>(LastChar);
-            LastChar = getchar();
-        } while (isalnum(LastChar) || LastChar == '_');
-    
-        if (IdentifierStr == "funk")
-            return tok_funk;
-    
-        if (IdentifierStr == "dih")
-            return tok_dih;
-    
-        return tok_identifier;
+    while (true) {
+        // Need a new line?
+        if (Pos >= Line.size()) {
+            if (!std::getline(std::cin, Line))
+                return tok_eof;
+
+            Line.push_back('\n');
+            Pos = 0;
+        }
+
+        char LastChar = Line[Pos++];
+
+        // Skip whitespace (except newline)
+        while (LastChar != '\n' &&
+               std::isspace(static_cast<unsigned char>(LastChar))) {
+            if (Pos >= Line.size())
+                break;
+            LastChar = Line[Pos++];
+        }
+
+        // Ignore empty lines
+        if (LastChar == '\n')
+            continue;
+
+        // Comments
+        if (LastChar == '~') {
+            while (Pos < Line.size() && Line[Pos] != '\n')
+                ++Pos;
+            continue;
+        }
+
+        // Identifier or keyword
+        if (std::isalpha(static_cast<unsigned char>(LastChar)) ||
+            LastChar == '_') {
+
+            IdentifierStr.clear();
+            IdentifierStr += LastChar;
+
+            while (Pos < Line.size()) {
+                char C = Line[Pos];
+                if (!std::isalnum(static_cast<unsigned char>(C)) &&
+                    C != '_')
+                    break;
+
+                IdentifierStr += C;
+                ++Pos;
+            }
+
+            if (IdentifierStr == "funk")
+                return tok_funk;
+
+            if (IdentifierStr == "dih")
+                return tok_dih;
+
+            return tok_identifier;
+        }
+
+        // Number
+        if (std::isdigit(static_cast<unsigned char>(LastChar)) ||
+            LastChar == '.') {
+
+            std::string NumStr;
+            NumStr += LastChar;
+
+            while (Pos < Line.size()) {
+                char C = Line[Pos];
+
+                if (!std::isdigit(static_cast<unsigned char>(C)) &&
+                    C != '.')
+                    break;
+
+                NumStr += C;
+                ++Pos;
+            }
+
+            NumVal = std::strtod(NumStr.c_str(), nullptr);
+            return tok_number;
+        }
+
+        // Single-character token
+        return LastChar;
     }
-
-    if (LastChar == '~') {
-    // Comment until end of line.
-    do
-        LastChar = getchar();
-    while (LastChar != EOF &&
-           LastChar != '\n' &&
-           LastChar != '\r');
-
-    if (LastChar != EOF)
-        return gettok();
-    }   
-
-
-    if (isdigit(LastChar) || LastChar == '.') {   // Number: [0-9.]+
-      std::string NumStr;
-      do {
-        NumStr += LastChar;
-        LastChar = getchar();
-      } while (isdigit(LastChar) || LastChar == '.');
-
-      NumVal = strtod(NumStr.c_str(), 0);
-      return tok_number;
-    }
-
-    // EOF
-    if (LastChar == EOF)
-        return tok_eof;
-
-    // Return single-character tokens.
-    int ThisChar = LastChar;
-    LastChar = getchar();
-    return ThisChar;
 }

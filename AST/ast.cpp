@@ -1,16 +1,25 @@
 #include "ast.h"
+
+#include <cstdio>
 #include <map>
 
-#include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/Constants.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
-#include <llvm/IR/Value.h>
-
+#include <llvm/IR/Verifier.h>
+#include <llvm/Support/raw_ostream.h>
 
 static std::unique_ptr<llvm::LLVMContext> TheContext;
 static std::unique_ptr<llvm::IRBuilder<>> Builder;
 static std::unique_ptr<llvm::Module> TheModule;
 static std::map<std::string, llvm::Value *> NamedValues;
+
+void InitializeModule() {
+    TheContext = std::make_unique<llvm::LLVMContext>();
+    TheModule = std::make_unique<llvm::Module>("Ketlang", *TheContext);
+    Builder = std::make_unique<llvm::IRBuilder<>>(*TheContext);
+}
 
 llvm::Value *LogErrorV(const char *Str) {
     fprintf(stderr, "Error: %s\n", Str);
@@ -31,6 +40,7 @@ llvm::Value *VariableExprAST::codegen() {
 llvm::Value *BinaryExprAST::codegen() {
     llvm::Value *L = LHS->codegen();
     llvm::Value *R = RHS->codegen();
+
     if (!L || !R)
         return nullptr;
 
@@ -50,6 +60,7 @@ llvm::Value *BinaryExprAST::codegen() {
 
 llvm::Value *CallExprAST::codegen() {
     llvm::Function *CalleeF = TheModule->getFunction(Callee);
+
     if (!CalleeF)
         return LogErrorV("Unknown function referenced");
 
@@ -64,14 +75,34 @@ llvm::Value *CallExprAST::codegen() {
         ArgsV.push_back(V);
     }
 
-    return Builder->CreateCall(CalleeF, ArgsV, "calltmp");
+    return Builder->CreateCall(
+        CalleeF->getFunctionType(),
+        CalleeF,
+        ArgsV,
+        "calltmp");
 }
 
-
 llvm::Function *PrototypeAST::codegen() {
-    std::vector<llvm::Type *> Doubles(Args.size(), llvm::Type::getDoubleTy(*TheContext));
-    llvm::FunctionType *FT = llvm::FunctionType::get(llvm::Type::getDoubleTy(*TheContext), Doubles, false);
-    llvm::Function *F = llvm::Function::Create(FT, llvm::Function::ExternalLinkage, Name, TheModule.get());
+    // Reuse an existing declaration if one already exists.
+    if (llvm::Function *F = TheModule->getFunction(Name))
+        return F;
+
+    std::vector<llvm::Type *> Doubles(
+        Args.size(),
+        llvm::Type::getDoubleTy(*TheContext));
+
+    llvm::FunctionType *FT =
+        llvm::FunctionType::get(
+            llvm::Type::getDoubleTy(*TheContext),
+            Doubles,
+            false);
+
+    llvm::Function *F =
+        llvm::Function::Create(
+            FT,
+            llvm::Function::ExternalLinkage,
+            Name,
+            TheModule.get());
 
     unsigned Idx = 0;
     for (auto &Arg : F->args())
@@ -81,27 +112,68 @@ llvm::Function *PrototypeAST::codegen() {
 }
 
 llvm::Function *FunctionAST::codegen() {
-    llvm::Function *TheFunction = TheModule->getFunction(Proto->getName());
+    // Replace the previous anonymous expression.
+    if (Proto->getName() == "__anon_expr") {
+        if (llvm::Function *Old =
+                TheModule->getFunction("__anon_expr"))
+            Old->eraseFromParent();
+    }
+
+    llvm::Function *TheFunction =
+        TheModule->getFunction(Proto->getName());
+
+    if (!TheFunction)
+        TheFunction = Proto->codegen();
 
     if (!TheFunction)
         return nullptr;
 
-    if (!TheFunction->empty())
-        return (llvm::Function*)LogErrorV("Function already defined");
+    // Prevent redefinition of named functions.
+    if (!TheFunction->empty()) {
+        if (Proto->getName() == "__anon_expr") {
+            TheFunction->eraseFromParent();
+            TheFunction = Proto->codegen();
+            if (!TheFunction)
+                return nullptr;
+        } else {
+            return (llvm::Function *)LogErrorV(
+                "Function cannot be redefined");
+        }
+    }
 
-    llvm::BasicBlock *BB = llvm::BasicBlock::Create(*TheContext, "entry", TheFunction, nullptr);
+    llvm::BasicBlock *BB =
+        llvm::BasicBlock::Create(
+            *TheContext,
+            "entry",
+            TheFunction);
+
     Builder->SetInsertPoint(BB);
 
     NamedValues.clear();
+
     for (auto &Arg : TheFunction->args())
         NamedValues[std::string(Arg.getName())] = &Arg;
-    
-    if (llvm::Value *RetVal = Body->codegen()) {
-        Builder->CreateRet(RetVal);
-        verifyFunction(*TheFunction);
-        return TheFunction;
+
+    llvm::Value *RetVal = nullptr;
+
+    for (auto &Expr : Body) {
+        RetVal = Expr->codegen();
+        if (!RetVal)
+            break;
     }
 
-    TheFunction->eraseFromParent();
-    return nullptr;
+    if (!RetVal) {
+        TheFunction->eraseFromParent();
+        return nullptr;
+    }
+
+    Builder->CreateRet(RetVal);
+
+    if (llvm::verifyFunction(*TheFunction, &llvm::errs())) {
+        TheFunction->eraseFromParent();
+        return (llvm::Function *)LogErrorV(
+            "Function verification failed");
+    }
+
+    return TheFunction;
 }

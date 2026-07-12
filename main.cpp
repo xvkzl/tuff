@@ -1,5 +1,6 @@
 #include "Parser/parser.h"
 #include "Lexer/lexer.h"
+#include "AST/ast.h"
 
 #include <cstdio>
 #include <map>
@@ -12,7 +13,8 @@ int main() {
     BinopPrecedence['-'] = 20;
     BinopPrecedence['*'] = 40;
 
-    MainLoop();       // start REPL
+    InitializeModule();
+    MainLoop();
 
     return 0;
 }

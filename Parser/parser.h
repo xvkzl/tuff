@@ -5,6 +5,8 @@
 #include <memory>
 #include <map>
 
+int getNextToken();
+
 extern std::map<char, int> BinopPrecedence;
 std::unique_ptr<ExprAST> ParseExpression();
 std::unique_ptr<PrototypeAST> ParsePrototype();

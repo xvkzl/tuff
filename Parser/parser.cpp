@@ -1,15 +1,20 @@
 #include "parser.h"
 #include "../Lexer/lexer.h"
 
+#include <cctype>
 #include <cstdio>
 #include <map>
 #include <memory>
 #include <vector>
 
+#include <llvm/Support/raw_ostream.h>
+
 static int CurTok;
 
-static int getNextToken() {
-    return CurTok = gettok();
+int getNextToken() {
+    CurTok = gettok();
+    fprintf(stderr, "[PARSER] CurTok = %d\n", CurTok);
+    return CurTok;
 }
 
 
@@ -30,10 +35,12 @@ std::unique_ptr<T> LogError(const char *Str) {
 }
 
 static std::unique_ptr<ExprAST> ParseNumberExpr() {
+    fprintf(stderr, "ParseNumberExpr\n");
+
     auto Result = std::make_unique<NumberExprAST>(NumVal);
     getNextToken();
-    return std::move(Result);
-};
+    return Result;
+}
 
 static std::unique_ptr<ExprAST> ParseParenExpr() {
     getNextToken(); // eat '('
@@ -110,8 +117,8 @@ static std::unique_ptr<ExprAST> ParseBinOpRHS(
         }
 
         LHS = std::make_unique<BinaryExprAST>(BinOp, std::move(LHS), std::move(RHS));
-        }
-    };
+    }
+}
 
 
 
@@ -224,49 +231,48 @@ std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
 }
 
 void MainLoop() {
-    getNextToken(); // prime first token
-
     while (true) {
         fprintf(stderr, "ready> ");
 
-        // 🔥 skip useless tokens (VERY IMPORTANT)
-        while (CurTok == '\n' || CurTok == '\r' || CurTok == ' ')
-            getNextToken();
-
-        if (CurTok == ';') {
-            getNextToken();
-            continue;
-        }
+        getNextToken();
 
         switch (CurTok) {
         case tok_eof:
             return;
 
-        case tok_funk:
-            if (!ParseDefinition()) {
-                fprintf(stderr, "Error in function definition.\n");
+        case ';':
+            break;
 
-                // 🔥 recovery: skip until ';' or EOF or '}'
-                while (CurTok != ';' && CurTok != tok_eof && CurTok != '}')
-                    getNextToken();
+        case tok_funk:
+            if (auto FnAST = ParseDefinition()) {
+                if (auto *FnIR = FnAST->codegen()) {
+                    FnIR->print(llvm::errs());
+                    fprintf(stderr, "\n");
+                }
+            } else {
+                fprintf(stderr, "Error in function definition.\n");
             }
             break;
 
         case tok_dih:
-            if (!ParseExtern()) {
+            if (auto ProtoAST = ParseExtern()) {
+                if (auto *FnIR = ProtoAST->codegen()) {
+                    FnIR->print(llvm::errs());
+                    fprintf(stderr, "\n");
+                }
+            } else {
                 fprintf(stderr, "Error in extern.\n");
-                while (CurTok != ';' && CurTok != tok_eof)
-                    getNextToken();
             }
             break;
 
         default:
-            if (!ParseTopLevelExpr()) {
+            if (auto FnAST = ParseTopLevelExpr()) {
+                if (auto *FnIR = FnAST->codegen()) {
+                    FnIR->print(llvm::errs());
+                    fprintf(stderr, "\n");
+                }
+            } else {
                 fprintf(stderr, "Error in expression.\n");
-
-                // 🔥 recovery: skip until semicolon
-                while (CurTok != ';' && CurTok != tok_eof)
-                    getNextToken();
             }
             break;
         }
