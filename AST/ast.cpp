@@ -17,8 +17,8 @@
 #include <llvm/Transforms/Scalar/GVN.h>
 #include <llvm/Transforms/Scalar/Reassociate.h>
 #include <llvm/Transforms/Scalar/SimplifyCFG.h>
-
 #include <llvm/Passes/StandardInstrumentations.h>
+#include "llvm/TargetParser/Host.h"
 
 static std::unique_ptr<llvm::LLVMContext> TheContext;
 static std::unique_ptr<llvm::IRBuilder<>> Builder;
@@ -34,39 +34,34 @@ static std::unique_ptr<llvm::StandardInstrumentations> TheSI;
 
 static std::map<std::string, llvm::Value *> NamedValues;
 
-void InitializeModuleAndManagers(void) {
+void InitializeModuleAndManagers() {
     TheContext = std::make_unique<llvm::LLVMContext>();
+
     TheModule = std::make_unique<llvm::Module>("KetlangJIT", *TheContext);
-    // TheModule->setDataLayout(TheJIT->getDataLayout());
+    TheModule->setDataLayout(TheJIT->getDataLayout());
+    TheModule->setTargetTriple(llvm::Triple(llvm::sys::getDefaultTargetTriple()));
+
     Builder = std::make_unique<llvm::IRBuilder<>>(*TheContext);
 
-    TheFPM = std::make_unique<llvm::FunctionPassManager>();
     TheLAM = std::make_unique<llvm::LoopAnalysisManager>();
     TheFAM = std::make_unique<llvm::FunctionAnalysisManager>();
     TheCGAM = std::make_unique<llvm::CGSCCAnalysisManager>();
     TheMAM = std::make_unique<llvm::ModuleAnalysisManager>();
-    ThePIC = std::make_unique<llvm::PassInstrumentationCallbacks>();
-    TheSI = std::make_unique<llvm::StandardInstrumentations>(
-        *TheContext,
-        /*DebugLogging=*/true,
-        /*VerifyEach=*/false,
-        llvm::PrintPassOptions()
-    );
+    TheFPM = std::make_unique<llvm::FunctionPassManager>();
 
-    TheSI->registerCallbacks(*ThePIC, TheMAM.get());
+    llvm::PassBuilder PB;
 
+    PB.registerModuleAnalyses(*TheMAM);
+    PB.registerCGSCCAnalyses(*TheCGAM);
+    PB.registerFunctionAnalyses(*TheFAM);
+    PB.registerLoopAnalyses(*TheLAM);
+
+    PB.crossRegisterProxies(*TheLAM, *TheFAM, *TheCGAM, *TheMAM);
 
     TheFPM->addPass(llvm::InstCombinePass());
     TheFPM->addPass(llvm::ReassociatePass());
     TheFPM->addPass(llvm::GVNPass());
     TheFPM->addPass(llvm::SimplifyCFGPass());
-
-    llvm::PassBuilder PB;
-
-    PB.registerModuleAnalyses(*TheMAM);
-    PB.registerFunctionAnalyses(*TheFAM);
-
-    PB.crossRegisterProxies(*TheLAM, *TheFAM, *TheCGAM, *TheMAM);
 }
 
 llvm::Value *LogErrorV(const char *Str) {

@@ -4,23 +4,35 @@
 
 #include <cstdio>
 #include <map>
-// std::unique_ptr<KetlangJIT> TheJIT;
+#include <memory>
+
+#include "llvm/ExecutionEngine/Orc/LLJIT.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/Error.h"
+#include "llvm/Support/raw_ostream.h"
+
+std::unique_ptr<llvm::orc::LLJIT> TheJIT;
 std::map<char, int> BinopPrecedence;
 
 int main() {
-/*
-    InitializeNativeTarget();
-    InitializeNativeTargetAsmPrinter();
-    InitializeNativeTargetAsmParser();
-*/
+    llvm::InitializeNativeTarget();
+    llvm::InitializeNativeTargetAsmPrinter();
+    llvm::InitializeNativeTargetAsmParser();
+
+    auto J = llvm::orc::LLJITBuilder().create();
+    if (!J) {
+        llvm::errs() << llvm::toString(J.takeError()) << '\n';
+        return 1;
+    }
+
+    TheJIT = std::move(*J);
+
     BinopPrecedence['<'] = 10;
     BinopPrecedence['+'] = 20;
     BinopPrecedence['-'] = 20;
     BinopPrecedence['*'] = 40;
 
     InitializeModuleAndManagers();
-
-/*  TheJIT = std::make_unique<KaleidoscopeJIT>(); */
 
     MainLoop();
 

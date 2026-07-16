@@ -6,6 +6,7 @@
 
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Value.h>
+extern std::unique_ptr<llvm::orc::LLJIT> TheJIT;
 
 void InitializeModuleAndManagers();
 
