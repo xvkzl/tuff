@@ -7,7 +7,7 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Value.h>
 
-void InitializeModule();
+void InitializeModuleAndManagers();
 
 class ExprAST {
 public:

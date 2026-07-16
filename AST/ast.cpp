@@ -10,15 +10,63 @@
 #include <llvm/IR/Verifier.h>
 #include <llvm/Support/raw_ostream.h>
 
+#include <llvm/IR/PassManager.h>
+#include <llvm/Passes/PassBuilder.h>
+
+#include <llvm/Transforms/InstCombine/InstCombine.h>
+#include <llvm/Transforms/Scalar/GVN.h>
+#include <llvm/Transforms/Scalar/Reassociate.h>
+#include <llvm/Transforms/Scalar/SimplifyCFG.h>
+
+#include <llvm/Passes/StandardInstrumentations.h>
+
 static std::unique_ptr<llvm::LLVMContext> TheContext;
 static std::unique_ptr<llvm::IRBuilder<>> Builder;
 static std::unique_ptr<llvm::Module> TheModule;
+
+static std::unique_ptr<llvm::FunctionPassManager> TheFPM;
+static std::unique_ptr<llvm::LoopAnalysisManager> TheLAM;
+static std::unique_ptr<llvm::FunctionAnalysisManager> TheFAM;
+static std::unique_ptr<llvm::CGSCCAnalysisManager> TheCGAM;
+static std::unique_ptr<llvm::ModuleAnalysisManager> TheMAM;
+static std::unique_ptr<llvm::PassInstrumentationCallbacks> ThePIC;
+static std::unique_ptr<llvm::StandardInstrumentations> TheSI;
+
 static std::map<std::string, llvm::Value *> NamedValues;
 
-void InitializeModule() {
+void InitializeModuleAndManagers(void) {
     TheContext = std::make_unique<llvm::LLVMContext>();
-    TheModule = std::make_unique<llvm::Module>("Ketlang", *TheContext);
+    TheModule = std::make_unique<llvm::Module>("KetlangJIT", *TheContext);
+    // TheModule->setDataLayout(TheJIT->getDataLayout());
     Builder = std::make_unique<llvm::IRBuilder<>>(*TheContext);
+
+    TheFPM = std::make_unique<llvm::FunctionPassManager>();
+    TheLAM = std::make_unique<llvm::LoopAnalysisManager>();
+    TheFAM = std::make_unique<llvm::FunctionAnalysisManager>();
+    TheCGAM = std::make_unique<llvm::CGSCCAnalysisManager>();
+    TheMAM = std::make_unique<llvm::ModuleAnalysisManager>();
+    ThePIC = std::make_unique<llvm::PassInstrumentationCallbacks>();
+    TheSI = std::make_unique<llvm::StandardInstrumentations>(
+        *TheContext,
+        /*DebugLogging=*/true,
+        /*VerifyEach=*/false,
+        llvm::PrintPassOptions()
+    );
+
+    TheSI->registerCallbacks(*ThePIC, TheMAM.get());
+
+
+    TheFPM->addPass(llvm::InstCombinePass());
+    TheFPM->addPass(llvm::ReassociatePass());
+    TheFPM->addPass(llvm::GVNPass());
+    TheFPM->addPass(llvm::SimplifyCFGPass());
+
+    llvm::PassBuilder PB;
+
+    PB.registerModuleAnalyses(*TheMAM);
+    PB.registerFunctionAnalyses(*TheFAM);
+
+    PB.crossRegisterProxies(*TheLAM, *TheFAM, *TheCGAM, *TheMAM);
 }
 
 llvm::Value *LogErrorV(const char *Str) {
@@ -174,6 +222,8 @@ llvm::Function *FunctionAST::codegen() {
         return (llvm::Function *)LogErrorV(
             "Function verification failed");
     }
+    
+    TheFPM->run(*TheFunction, *TheFAM);
 
     return TheFunction;
 }
